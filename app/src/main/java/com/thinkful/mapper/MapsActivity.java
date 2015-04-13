@@ -1,9 +1,15 @@
 package com.thinkful.mapper;
 
+import android.location.Location;
 import android.os.Handler;
 import android.support.v4.app.FragmentActivity;
 import android.os.Bundle;
+import android.util.Log;
 
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.location.LocationListener;
+import com.google.android.gms.location.LocationRequest;
+import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.maps.CameraUpdate;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
@@ -11,22 +17,44 @@ import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.common.api.GoogleApiClient.*;
+import com.google.android.gms.maps.model.PolylineOptions;
 
-public class MapsActivity extends FragmentActivity {
+public class MapsActivity extends FragmentActivity implements ConnectionCallbacks, OnConnectionFailedListener,
+        LocationListener {
 
     private GoogleMap mMap; // Might be null if Google Play services APK is not available.
+    private GoogleApiClient mGoogleApiClient;
+    // private Location mCurrentLocation;
+    private Location mLastLocation;
+    private LocationRequest mLocationRequest;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_maps);
         setUpMapIfNeeded();
+        mGoogleApiClient = new GoogleApiClient.Builder(this)
+                .addConnectionCallbacks(this)
+                .addOnConnectionFailedListener(this)
+                .addApi(LocationServices.API)
+                .build();
     }
 
     @Override
     protected void onResume() {
         super.onResume();
-        setUpMapIfNeeded();
+        if (mGoogleApiClient.isConnected()) {
+            setUpMapIfNeeded();    // <-from previous tutorial
+            startLocationUpdates();
+        }
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        mGoogleApiClient.connect();
     }
 
     /**
@@ -64,31 +92,65 @@ public class MapsActivity extends FragmentActivity {
      * This should only be called once and when we are sure that {@link #mMap} is not null.
      */
     private void setUpMap() {
-        mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(
-                new LatLng(40.72493, -73.996599), 10));
-        Handler handler = new Handler();
-        handler.postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                mMap.animateCamera(CameraUpdateFactory.zoomTo(19),2000,
-                        new GoogleMap.CancelableCallback() {
-                            @Override
-                            public void onFinish() {
-                                mMap.addMarker(new MarkerOptions()
-                                        .position(new LatLng(40.72493, -73.996599))
-                                        .title("Thinkful Headquarters")
-                                        .icon(BitmapDescriptorFactory.fromResource(R.drawable.thinkful))
-                                        .snippet("On a mission to reinvent education"))
-                                        .showInfoWindow();
-                            }
-
-                            @Override
-                            public void onCancel() {
-
-                            }
-                        });
-            }
-        }, 2000);
         mMap.setMapType(GoogleMap.MAP_TYPE_NORMAL);
+    }
+
+    @Override
+    public void onConnected(Bundle bundle) {
+        Location mCurrentLocation = LocationServices.FusedLocationApi.getLastLocation(
+                mGoogleApiClient);
+        showLocation(mCurrentLocation);
+        mLastLocation = mCurrentLocation;
+        startLocationUpdates();
+    }
+
+    protected void showLocation(Location mCurrentLocation) {
+        if (mCurrentLocation != null) {
+            Log.i("Where am I?",
+                    "Latitude: " + mCurrentLocation.getLatitude() + ", Longitude:" + mCurrentLocation.getLongitude());
+            mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(
+                    new LatLng(mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude()), 15));
+        }
+    }
+
+    @Override
+    public void onConnectionSuspended(int i) {
+
+    }
+
+    @Override
+    public void onConnectionFailed(ConnectionResult connectionResult) {
+
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        //stop location updates
+        LocationServices.FusedLocationApi.removeLocationUpdates(
+                mGoogleApiClient, this);
+    }
+
+    protected void startLocationUpdates() {
+        LocationRequest mLocationRequest = new LocationRequest();
+        mLocationRequest.setInterval(10000);
+        mLocationRequest.setFastestInterval(5000);
+        mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
+        LocationServices.FusedLocationApi.requestLocationUpdates(mGoogleApiClient, mLocationRequest, this);
+    }
+
+    @Override
+    public void onLocationChanged(Location location) {
+        showLocation(location);
+        drawPolyline(location);
+    }
+
+    private void drawPolyline(Location location) {
+        if (mLastLocation != null && location != null) {
+            mMap.addPolyline(new PolylineOptions().add(
+                    new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude()),
+                    new LatLng(location.getLatitude(), location.getLongitude())));
+            mLastLocation = location;
+        }
     }
 }
