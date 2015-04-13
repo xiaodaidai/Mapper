@@ -110,6 +110,13 @@ public class MapsActivity extends FragmentActivity implements ConnectionCallback
                     "Latitude: " + mCurrentLocation.getLatitude() + ", Longitude:" + mCurrentLocation.getLongitude());
             mMap.moveCamera(CameraUpdateFactory.newLatLngZoom(
                     new LatLng(mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude()), 15));
+            if (mLastLocation !=null) {
+                mMap.addPolyline(new PolylineOptions()
+                                .add(new LatLng(mCurrentLocation.getLatitude(), mCurrentLocation.getLongitude()))
+                                .add(new LatLng(mLastLocation.getLatitude(), mLastLocation.getLongitude()))
+                );
+            }
+            mLastLocation = mCurrentLocation;
         }
     }
 
@@ -142,7 +149,7 @@ public class MapsActivity extends FragmentActivity implements ConnectionCallback
     @Override
     public void onLocationChanged(Location location) {
         showLocation(location);
-        drawPolyline(location);
+        // drawPolyline(location);
     }
 
     private void drawPolyline(Location location) {
